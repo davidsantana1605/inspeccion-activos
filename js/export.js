@@ -12,7 +12,7 @@ import { csvEscape, buildingsToCsv } from './csv.js';
 import { getSavedAssets, getMedia, isPending, deleteAsset, folderName, blobId, nowIso } from './data.js';
 
 const PART_OVERHEAD = 4096; // estimated bytes of JSON/CSV/txt per asset for partition planning
-const CSV_COLUMNS = ['id', 'seq', 'inspector', 'created_at', 'building_code', 'building_name', 'floor', 'department', 'notes', 'n_photos', 'n_audios', 'folder'];
+const CSV_COLUMNS = ['id', 'seq', 'inspector', 'created_at', 'building_code', 'building_name', 'floor', 'department', 'notes', 'n_photos', 'n_audios', 'folder', 'gps_lat', 'gps_lon', 'gps_accuracy_m'];
 
 // ---------------------------------------------------------------- pure helpers (testable in Node)
 
@@ -66,7 +66,7 @@ export function buildAssetDoc(asset, photos, audios, names, exportedAt, deviceId
 export function assetsToCsv(docs) {
   const lines = [CSV_COLUMNS.join(',')];
   for (const d of docs) {
-    const row = { ...d, n_photos: d.photos.length, n_audios: d.audios.length, folder: folderName(d) };
+    const row = { ...d, n_photos: d.photos.length, n_audios: d.audios.length, folder: folderName(d), gps_lat: d.gps?.lat ?? '', gps_lon: d.gps?.lon ?? '', gps_accuracy_m: d.gps?.accuracy_m ?? '' };
     lines.push(CSV_COLUMNS.map((k) => csvEscape(row[k])).join(','));
   }
   return '﻿' + lines.join('\r\n') + '\r\n';

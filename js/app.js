@@ -61,6 +61,7 @@ async function render() {
   assetsUi.leave();
   const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
   const route = path || '';
+  document.body.dataset.route = route;
   document.querySelectorAll('.topnav a').forEach((a) => a.classList.toggle('active', a.dataset.route === route));
   try { await (routes[route] || routes[''])(new URLSearchParams(query)); } catch (e) { reportError(e); }
   $app.focus({ preventScroll: true });
@@ -263,7 +264,8 @@ async function boot() {
     state.deviceId = await db.ensureDeviceId();
     state.persisted = await requestPersistence();
     try { const n = await recoverOrphanAudio(); if (n) showBanner('audio-rec', 'info', `Se recuperaron ${n} nota(s) de voz de una grabación interrumpida.`, [{ label: 'OK', onClick: () => hideBanner('audio-rec') }]); } catch (e) { console.error(e); }
-    if (!state.persisted) showBanner('persist', 'warn', 'El navegador no concedió almacenamiento persistente. Exporta tus datos con frecuencia.', [{ label: 'Entendido', onClick: () => hideBanner('persist') }]);
+    let dismissed = false; try { dismissed = localStorage.getItem('persist_dismissed') === '1'; } catch (_) { /* ignore */ }
+    if (!state.persisted && !dismissed) showBanner('persist', 'warn', 'Sin almacenamiento persistente: exporta con frecuencia.', [{ label: 'OK', onClick: () => { hideBanner('persist'); try { localStorage.setItem('persist_dismissed', '1'); } catch (_) { /* ignore */ } } }]);
   } catch (e) {
     showBanner('db', 'error', 'No se puede usar el almacenamiento local: ' + esc(e.message) + ' La app no puede guardar datos en este modo (¿navegación privada?).');
   }
