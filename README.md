@@ -2,7 +2,7 @@
 
 App web instalable para registrar activos en campo, 100 % offline después de la primera carga. Sitio estático (HTML + CSS + JS, sin build) pensado para GitHub Pages. La especificación completa está en `BRIEF_App_Inspeccion_Activos.md`.
 
-**Estado: fases 1–6 implementadas (v0.2.0).** Verificado en navegador de escritorio: registro, contexto recordado, fotos (redimensión y miniaturas), exportación ZIP, respaldo/restauración y lista con 300 activos. **Sin probar aún en dispositivo real:** cámara nativa, micrófono, compartir y modo avión en el S21 Ultra (ver pruebas manuales abajo).
+**Estado: fases 1–6 implementadas (v0.2.1).** Verificado en navegador de escritorio: registro, contexto recordado, fotos (redimensión y miniaturas), exportación ZIP, respaldo/restauración y lista con 300 activos. **Sin probar aún en dispositivo real:** cámara nativa, micrófono, compartir y modo avión en el S21 Ultra (ver pruebas manuales abajo).
 
 ## Estructura
 

@@ -117,12 +117,16 @@ export async function viewAssetForm(h, id) {
   const quality = await db.getSetting('photo_quality', 'alta');
   const buildings = await db.getAll('buildings');
   let chain = Promise.resolve();
+  let gone = false;     // set before deleting: no late write may recreate the asset
+  let changed = false;  // user edits in this session
   let dirtyNotes = false;
   let timer = null;
   const mounts = [];
 
   const persist = () => {
-    chain = chain.then(() => db.put('assets', { ...a, updated_at: nowIso() })).catch((e) => h.reportError(e));
+    if (gone) return chain;
+    changed = true;
+    chain = chain.then(() => (gone ? null : db.put('assets', { ...a, updated_at: nowIso() }))).catch((e) => h.reportError(e));
     return chain;
   };
   const flushNotes = () => { clearTimeout(timer); if (dirtyNotes) { dirtyNotes = false; return persist(); } return chain; };
@@ -184,7 +188,7 @@ export async function viewAssetForm(h, id) {
 
   // GPS (optional, never blocks).
   if (!a.gps?.lat && !wasSaved && await db.getSetting('gps_enabled', false) && navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition((p) => { a.gps = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy_m: p.coords.accuracy }; persist(); }, () => {}, { timeout: 5000, maximumAge: 60000 });
+    navigator.geolocation.getCurrentPosition((p) => { if (gone) return; a.gps = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy_m: p.coords.accuracy }; persist(); }, () => {}, { timeout: 5000, maximumAge: 60000 });
   }
 
   cleanup = () => {
@@ -192,8 +196,8 @@ export async function viewAssetForm(h, id) {
     window.removeEventListener('pagehide', flushNotes);
     flushNotes();
     mounts.forEach((m) => { try { m?.destroy?.(); } catch (_) { /* ignore */ } });
-    if (wasSaved) { // media-only edits must still mark the asset as pending export
-      mediaCounts(a.id).then((c) => { if (c.photo !== openCounts.photo || c.audio !== openCounts.audio) return chain.then(() => db.put('assets', { ...a, updated_at: nowIso() })); }).catch(() => {});
+    if (wasSaved && !gone && !changed) { // media-only edits must still mark the asset as pending export
+      mediaCounts(a.id).then((c) => { if (!gone && (c.photo !== openCounts.photo || c.audio !== openCounts.audio)) return chain.then(() => (gone ? null : db.put('assets', { ...a, updated_at: nowIso() }))); }).catch(() => {});
     }
   };
 
@@ -205,8 +209,9 @@ export async function viewAssetForm(h, id) {
     const c = await mediaCounts(a.id);
     if (!a.notes.trim() && !c.photo && !c.audio) { msg('Agrega al menos una foto, nota de voz o nota de texto.'); return; }
     try {
-      a.inspector = await db.getSetting('inspector', '') || a.inspector;
       await chain;
+      if (wasSaved && !changed && c.photo === openCounts.photo && c.audio === openCounts.audio) { leave(); h.navigate(next ? '#/nuevo' : '#/'); return; } // nothing edited: don't touch updated_at
+      a.inspector = await db.getSetting('inspector', '') || a.inspector;
       const saved = await saveAsset(a);
       Object.assign(a, saved);
       leave();
@@ -218,10 +223,10 @@ export async function viewAssetForm(h, id) {
   $('#s-save').onclick = () => save(false);
   const sn = $('#s-next'); if (sn) sn.onclick = () => save(true);
   const sd = $('#s-discard'); if (sd) sd.onclick = async () => {
-    if (await h.confirmDlg('Descartar borrador', '<p>Se borrarán el borrador y sus fotos y audios. No se puede deshacer.</p>', 'Descartar', 'danger')) { leave(); await deleteAsset(a.id); h.navigate('#/'); }
+    if (await h.confirmDlg('Descartar borrador', '<p>Se borrarán el borrador y sus fotos y audios. No se puede deshacer.</p>', 'Descartar', 'danger')) { gone = true; leave(); await chain; await deleteAsset(a.id); h.navigate('#/'); }
   };
   const del = $('#s-del'); if (del) del.onclick = async () => {
-    if (await h.confirmDlg('Borrar activo', `<p>¿Borrar el activo #${a.seq} con todas sus fotos y audios? No se puede deshacer.</p>`, 'Borrar', 'danger')) { leave(); await deleteAsset(a.id); h.navigate('#/'); }
+    if (await h.confirmDlg('Borrar activo', `<p>¿Borrar el activo #${a.seq} con todas sus fotos y audios? No se puede deshacer.</p>`, 'Borrar', 'danger')) { gone = true; leave(); await chain; await deleteAsset(a.id); h.navigate('#/'); }
   };
 }
 
@@ -236,7 +241,7 @@ export async function viewHome(h) {
   let draft = null;
   for (const dr of all.filter((x) => x.status === 'draft').sort((x, y) => (y.updated_at || '').localeCompare(x.updated_at || ''))) {
     const c = await mediaCounts(dr.id);
-    if (!dr.notes.trim() && !c.photo && !c.audio) { await deleteAsset(dr.id); continue; }
+    if (!dr.notes.trim() && !c.photo && !c.audio && !c.chunk) { await deleteAsset(dr.id); continue; }
     if (!draft) draft = dr;
   }
   const saved = all.filter((x) => x.status === 'saved').sort((x, y) => (y.created_at || '').localeCompare(x.created_at || ''));

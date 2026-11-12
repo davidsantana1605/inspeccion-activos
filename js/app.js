@@ -262,7 +262,7 @@ async function boot() {
   try {
     state.deviceId = await db.ensureDeviceId();
     state.persisted = await requestPersistence();
-    recoverOrphanAudio().then((n) => { if (n) showBanner('audio-rec', 'info', `Se recuperaron ${n} nota(s) de voz de una grabación interrumpida.`, [{ label: 'OK', onClick: () => hideBanner('audio-rec') }]); }).catch(() => {});
+    try { const n = await recoverOrphanAudio(); if (n) showBanner('audio-rec', 'info', `Se recuperaron ${n} nota(s) de voz de una grabación interrumpida.`, [{ label: 'OK', onClick: () => hideBanner('audio-rec') }]); } catch (e) { console.error(e); }
     if (!state.persisted) showBanner('persist', 'warn', 'El navegador no concedió almacenamiento persistente. Exporta tus datos con frecuencia.', [{ label: 'Entendido', onClick: () => hideBanner('persist') }]);
   } catch (e) {
     showBanner('db', 'error', 'No se puede usar el almacenamiento local: ' + esc(e.message) + ' La app no puede guardar datos en este modo (¿navegación privada?).');

@@ -33,7 +33,8 @@ Blob record (store 'blobs', keyPath 'id', indexes asset_id, kind):
   id = `${kind}:${assetId}:${uuid}`   kind in 'photo' | 'thumb' | 'audio'
   photo: { id, asset_id, kind:'photo', uid, blob:Blob, mime_type, ext:'jpg'|'png'|..., source:'camera'|'gallery',
            is_screenshot:boolean, width, height, bytes, resized:boolean, captured_at:iso, order:number }
-  thumb: { id, asset_id, kind:'thumb', uid, blob:Blob, mime_type:'image/jpeg' }      (same uid as its photo)
+  thumb: { id, asset_id, kind:'thumb', uid, blob:Blob, mime_type:'image/jpeg', order }  (same uid and order as its photo)
+  audiochunk: transient pieces of a recording in progress (audio.js); recovered at boot by recoverOrphanAudio().
   audio: { id, asset_id, kind:'audio', uid, blob:Blob, mime_type, ext:'webm'|'m4a', duration_s, recorded_at:iso, transcript:null, order:number }
 `order` = Date.now() at creation; sort ascending for foto_01, foto_02... numbering.
 */
@@ -41,7 +42,7 @@ export const blobId = (kind, assetId, uid) => `${kind}:${assetId}:${uid}`;
 
 // Count media of an asset without loading blobs (primary keys only).
 export async function mediaCounts(assetId) {
-  const out = { photo: 0, audio: 0, thumbKey: null };
+  const out = { photo: 0, audio: 0, chunk: 0, thumbKey: null };
   await db.tx('blobs', 'readonly', (s) => new Promise((resolve, reject) => {
     const req = s.index('asset_id').openKeyCursor(IDBKeyRange.only(assetId));
     req.onsuccess = () => {
@@ -49,6 +50,7 @@ export async function mediaCounts(assetId) {
       if (!c) { resolve(); return; }
       const kind = String(c.primaryKey).split(':', 1)[0];
       if (kind === 'photo' || kind === 'audio') out[kind]++;
+      else if (kind === 'audiochunk') out.chunk++; // unfinished recording: counts as content
       else if (kind === 'thumb' && !out.thumbKey) out.thumbKey = c.primaryKey;
       c.continue();
     };
@@ -105,6 +107,7 @@ export async function saveAsset(asset) {
     if (!a.seq) {
       const cur = await wrap(st.settings.get('seq_counter'));
       a.seq = ((cur && cur.value) || 0) + 1;
+      a.created_at = a.updated_at; // stamp on first save so reused drafts don't keep an old date
       st.settings.put({ key: 'seq_counter', value: a.seq });
     }
     st.settings.put({ key: 'last_context', value: { building_code: a.building_code, building_name: a.building_name, floor: a.floor, department: a.department } });
