@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Inspección de Activos</title>
+  <meta name="theme-color" content="#1e3a5f">
+  <meta name="description" content="Registro de activos en campo, 100 % offline.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Inspección">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="banners" aria-live="polite"></div>
+  <header class="topbar">
+    <a class="brand" href="#/">Inspección de Activos</a>
+    <nav class="topnav" aria-label="Principal">
+      <a href="#/" data-route="">Inicio</a>
+      <a href="#/edificios" data-route="edificios">Edificios</a>
+      <a href="#/ajustes" data-route="ajustes">Ajustes</a>
+      <a href="#/ayuda" data-route="ayuda">Ayuda</a>
+    </nav>
+  </header>
+  <main id="app" tabindex="-1"><p class="muted pad">Cargando…</p></main>
+  <dialog id="dlg"></dialog>
+  <noscript><p class="pad">Esta app necesita JavaScript.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
