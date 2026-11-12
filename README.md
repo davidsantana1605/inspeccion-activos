@@ -77,6 +77,10 @@ B-05,"Taller de Mantenimiento, Anexo"
 
 `inspeccion_{device8}_{YYYYMMDD-HHmm}_parte{n}.zip` con `manifest.json`, `activos.csv` (UTF-8 con BOM), `activos.json`, `edificios.csv` y `activos/{BLDG}_{seq4}_{uuid8}/` con `activo.json`, `foto_NN.jpg`, `captura_NN.png`, `audio_NN.webm|m4a` y `notas.txt`. Se parte en varios ZIP según el tamaño máximo elegido. El respaldo completo (`respaldo_*.zip`) se restaura desde Exportar → *Restaurar respaldo*.
 
+## Transcribir las notas de voz (escritorio)
+
+La app solo graba los audios. Para transcribirlos en tu PC (Whisper local, español) usa `tools/transcribir_audios.py`: toma los ZIP exportados y devuelve una copia con el campo `transcript` de cada audio rellenado, más `transcripciones.csv`. Instrucciones y requisitos en `tools/README_transcribir.md`.
+
 ## Pruebas manuales en el S21 Ultra — Fase 1
 
 1. Abrir la URL en Chrome con internet → *Instalar app*.

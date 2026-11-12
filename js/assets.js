@@ -152,9 +152,10 @@ export async function viewAssetForm(h, id) {
 
   const paintCtx = () => {
     const b = $('#c-b'), f = $('#c-f'), d = $('#c-d');
-    b.innerHTML = `<small>Edificio</small><strong>${a.building_code ? h.esc(a.building_code) : 'Elegir'}</strong><span>${h.esc(a.building_name)}</span>`;
-    f.innerHTML = `<small>Piso</small><strong>${a.floor ? h.esc(floorLabel(a.floor)) : 'Elegir'}</strong>`;
-    d.innerHTML = `<small>Departamento</small><strong>${a.department ? h.esc(a.department) : 'Elegir'}</strong>`;
+    b.innerHTML = `<small>🏢 Edificio</small><strong>${a.building_code ? h.esc(a.building_code) : 'Elegir edificio'}</strong><span>${h.esc(a.building_name)}</span>`;
+    f.innerHTML = `<small>🪜 Piso</small><strong>${a.floor ? h.esc(floorLabel(a.floor)) : 'Elegir piso'}</strong>`;
+    d.innerHTML = `<small>🧰 Departamento</small><strong>${a.department ? h.esc(a.department) : 'Elegir'}</strong>`;
+    b.classList.toggle('empty', !a.building_code); f.classList.toggle('empty', !a.floor); d.classList.toggle('empty', !a.department);
   };
   paintCtx();
 
@@ -263,6 +264,7 @@ export async function viewHome(h) {
 
   h.$app.innerHTML = `
     <h1>Inicio</h1>
+    ${inspector ? `<p class="hello">Hola, ${h.esc(inspector)} 👋</p>` : ''}
     ${todo.length ? `<div class="card"><strong>Configuración pendiente</strong><ul>${todo.join('')}</ul></div>` : ''}
     ${draft ? `<div class="card draft"><strong>Tienes un borrador sin guardar</strong><p class="muted">${h.esc([draft.building_code, draft.floor && floorLabel(draft.floor), draft.department].filter(Boolean).join(' · ') || 'Sin contexto')}</p>
       <div class="row"><a class="btn primary" href="#/activo?id=${h.esc(draft.id)}">Continuar</a></div></div>` : ''}
@@ -272,12 +274,13 @@ export async function viewHome(h) {
       <div><strong>${saved.length}</strong><span>total</span></div>
       <div><strong>${pending}</strong><span>por exportar</span></div>
     </div>
+    <div class="section-title">Activos registrados</div>
     <div class="card">
       <input id="f-q" type="search" placeholder="Buscar en notas, edificio, departamento…" aria-label="Buscar" value="${h.esc(filters.q)}">
       <div class="row filters">
-        <select id="f-b" aria-label="Filtrar por edificio"><option value="">Todos los edificios</option>${opt(buildingsSeen, filters.b)}</select>
-        <select id="f-f" aria-label="Filtrar por piso"><option value="">Todos los pisos</option>${opt(floorsSeen, filters.f, floorLabel)}</select>
-        <select id="f-d" aria-label="Filtrar por departamento"><option value="">Todos los departamentos</option>${opt(deptsSeen, filters.d)}</select>
+        <select id="f-b" aria-label="Filtrar por edificio"><option value="">Edificio</option>${opt(buildingsSeen, filters.b)}</select>
+        <select id="f-f" aria-label="Filtrar por piso"><option value="">Piso</option>${opt(floorsSeen, filters.f, floorLabel)}</select>
+        <select id="f-d" aria-label="Filtrar por departamento"><option value="">Departamento</option>${opt(deptsSeen, filters.d)}</select>
       </div>
     </div>
     <div id="list"></div>
@@ -290,13 +293,13 @@ export async function viewHome(h) {
     const q = normSearch(filters.q).trim();
     const rows = saved.filter((x) => (!filters.b || x.building_code === filters.b) && (!filters.f || x.floor === filters.f) && (!filters.d || x.department === filters.d)
       && (!q || normSearch([x.notes, x.building_code, x.building_name, x.department, x.floor, '#' + x.seq].join(' ')).includes(q)));
-    if (!rows.length) { $list.innerHTML = `<div class="card"><p class="muted">${saved.length ? 'Ningún activo coincide con los filtros.' : 'Aún no hay activos registrados.'}</p></div>`; return; }
+    if (!rows.length) { $list.innerHTML = `<div class="card empty-state"><span class="big-emoji">${saved.length ? '🔍' : '📋'}</span><strong>${saved.length ? 'Ningún activo coincide' : 'Aún no hay activos'}</strong><p class="muted">${saved.length ? 'Prueba con otros filtros o borra la búsqueda.' : 'Toca “+ Nuevo activo” para registrar el primero.'}</p></div>`; return; }
     const page = rows.slice(0, filters.limit);
     $list.innerHTML = `<ul class="assets">${page.map((x) => `<li><a class="asset-item" href="#/activo?id=${h.esc(x.id)}" data-id="${h.esc(x.id)}">
       <span class="thumb" aria-hidden="true"></span>
       <span class="info"><strong>#${x.seq} · ${h.esc(x.building_code)} · ${h.esc(floorLabel(x.floor))}</strong>
       <span>${h.esc(x.department || '—')}</span>
-      <span class="muted meta">…</span>
+      <span class="chips meta"></span>
       ${x.notes ? `<span class="muted note">${h.esc(x.notes.slice(0, 90))}</span>` : ''}</span></a></li>`).join('')}</ul>
       ${rows.length > page.length ? `<button class="btn big" id="more">Mostrar más (${rows.length - page.length})</button>` : ''}`;
     const more = $list.querySelector('#more'); if (more) more.onclick = () => { filters.limit += 50; drawList(); };
@@ -306,7 +309,7 @@ export async function viewHome(h) {
         const x = byId.get(el.dataset.id);
         const c = await mediaCounts(x.id);
         if (!el.isConnected) return;
-        el.querySelector('.meta').textContent = `📷 ${c.photo} · 🎙 ${c.audio}${isPending(x) ? ' · por exportar' : ' · exportado'}`;
+        el.querySelector('.meta').innerHTML = `<span class="chip">📷 ${c.photo}</span><span class="chip">🎙 ${c.audio}</span>${isPending(x) ? '<span class="chip pending">por exportar</span>' : '<span class="chip done">exportado ✓</span>'}`;
         if (c.thumbKey) {
           const t = await db.get('blobs', c.thumbKey);
           if (t && el.isConnected) { const u = URL.createObjectURL(t.blob); urls.push(u); el.querySelector('.thumb').style.backgroundImage = `url(${u})`; }
