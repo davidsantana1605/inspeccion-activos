@@ -1,0 +1,9 @@
+/* Export screen. Only extra classes (x-*); base look comes from styles.css. */
+.x-h { margin-top: 0; }
+.x-field { flex: 1 1 8rem; min-width: 8rem; }
+.x-prog { margin: .75rem 0; }
+.x-prog progress { width: 100%; height: 1.25rem; accent-color: currentColor; }
+.x-parts { list-style: none; margin: .5rem 0 0; padding: 0; }
+.x-parts li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem 0; border-top: 1px solid rgba(128, 128, 128, .3); }
+.x-parts .x-pname { flex: 1 1 100%; font-weight: 600; word-break: break-all; }
+.x-parts .btn { flex: 0 0 auto; }

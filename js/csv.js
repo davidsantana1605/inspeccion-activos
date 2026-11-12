@@ -99,6 +99,29 @@ export function parseBuildingsCsv(buffer) {
   return out;
 }
 
+// One-column CSV (header "DEPARTMENT", optional) -> { names:[string], duplicates:[string], errors:[string] }
+export function parseDepartmentsCsv(buffer) {
+  const out = { names: [], duplicates: [], errors: [] };
+  let decoded;
+  try { decoded = decodeBytes(buffer); } catch (e) { out.errors.push('No se pudo leer el archivo: ' + e.message); return out; }
+  const text = decoded.text.replace(/^﻿/, '');
+  if (!text.trim()) { out.errors.push('El archivo está vacío.'); return out; }
+  let records;
+  try { records = parseRecords(text, detectDelimiter(text)); } catch (e) { out.errors.push(e.message); return out; }
+  const seen = new Set();
+  let first = true;
+  for (const rec of records) {
+    const name = clean(rec[0]);
+    if (!name) continue;
+    if (first) { first = false; if (['department', 'departamento', 'departamentos'].includes(headerNorm(name))) continue; }
+    const k = keyOf(name);
+    if (seen.has(k)) { out.duplicates.push(name); continue; }
+    seen.add(k); out.names.push(name);
+  }
+  if (!out.names.length) out.errors.push('No se encontraron departamentos.');
+  return out;
+}
+
 export function csvEscape(v) {
   const s = String(v ?? '');
   return /[",\r\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;

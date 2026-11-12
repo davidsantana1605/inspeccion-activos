@@ -1,0 +1,18 @@
+/* Voice notes (js/audio.js). Uses theme variables from styles.css. */
+.audio-box { display: flex; flex-direction: column; gap: 10px; }
+.audio-rec-btn { width: 100%; min-height: 64px; font-size: 1.2rem; }
+.audio-rec-btn.audio-recording { background: var(--danger); border-color: var(--danger); color: #fff; animation: audio-pulse 1.2s ease-in-out infinite; }
+.audio-timer { text-align: center; font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); }
+.audio-timer[hidden], .audio-error[hidden] { display: none; }
+.audio-error { background: var(--err-bg); color: var(--err-text); border: 1px solid var(--danger); border-radius: 12px; padding: 10px 12px; font-weight: 600; }
+.audio-explain p { margin: 0 0 10px; }
+.audio-list { display: flex; flex-direction: column; }
+.audio-item { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.audio-item-head { justify-content: space-between; }
+.audio-item-head > * { flex: 0 1 auto; }
+.audio-player { width: 100%; min-height: 40px; }
+.audio-item-actions { justify-content: flex-end; }
+.audio-item-actions > .btn { flex: 0 1 auto; }
+.audio-confirm-text { flex: 1 1 100%; font-weight: 700; }
+@keyframes audio-pulse { 50% { opacity: .75; } }
+@media (prefers-reduced-motion: reduce) { .audio-rec-btn.audio-recording { animation: none; } }

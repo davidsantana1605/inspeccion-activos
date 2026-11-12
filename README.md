@@ -2,13 +2,15 @@
 
 App web instalable para registrar activos en campo, 100 % offline después de la primera carga. Sitio estático (HTML + CSS + JS, sin build) pensado para GitHub Pages. La especificación completa está en `BRIEF_App_Inspeccion_Activos.md`.
 
-**Estado: Fase 1 de 6** — esqueleto PWA, Ajustes (inspector), importación/edición de edificios. Registro de activos, fotos, audio y exportación llegan en las fases 2–5.
+**Estado: fases 1–6 implementadas (v0.2.0).** Verificado en navegador de escritorio: registro, contexto recordado, fotos (redimensión y miniaturas), exportación ZIP, respaldo/restauración y lista con 300 activos. **Sin probar aún en dispositivo real:** cámara nativa, micrófono, compartir y modo avión en el S21 Ultra (ver pruebas manuales abajo).
 
 ## Estructura
 
 ```
 index.html  styles.css  manifest.webmanifest  sw.js  .nojekyll
-js/    app.js (UI y rutas) · db.js (IndexedDB) · csv.js (parser) · version.js
+js/    app.js (rutas, ajustes, edificios) · assets.js (formulario, lista, departamentos) · data.js (contratos de datos)
+       photos.js · audio.js · export.js · db.js (IndexedDB) · csv.js · version.js
+css/   photos.css · audio.css · export.css      vendor/ fflate.esm.js (ZIP, vendorizado)
 icons/ iconos PNG (any, maskable, apple-touch)
 tools/ make-icons.ps1 · check-precache.mjs
 edificios_ejemplo.csv
@@ -65,9 +67,15 @@ B-05,"Taller de Mantenimiento, Anexo"
 - *Exportar CSV* en Edificios descarga `edificios.csv` (UTF-8 con BOM).
 - Para dar la misma lista a todos los inspectores, compartan el mismo CSV. `edificios_ejemplo.csv` es solo de prueba.
 
+## Modelo de datos (resumen)
+
+- `assets`: un registro por activo (`status` `draft` | `saved`). El borrador se autoguarda en cada cambio; el `seq` se asigna al guardar por primera vez.
+- `blobs`: fotos (`photo`), miniaturas (`thumb`), audios (`audio`) y trozos de grabación en curso (`audiochunk`). Los módulos de medios nunca escriben el registro del activo; `photos[]`/`audios[]` se arman al exportar.
+- Contexto recordado en `settings.last_context`. Un activo está "por exportar" si nunca se exportó o se editó después (`updated_at > exported_at`).
+
 ## Formato del ZIP exportado
 
-Se documenta en la Fase 5 (ver sección 8 del brief).
+`inspeccion_{device8}_{YYYYMMDD-HHmm}_parte{n}.zip` con `manifest.json`, `activos.csv` (UTF-8 con BOM), `activos.json`, `edificios.csv` y `activos/{BLDG}_{seq4}_{uuid8}/` con `activo.json`, `foto_NN.jpg`, `captura_NN.png`, `audio_NN.webm|m4a` y `notas.txt`. Se parte en varios ZIP según el tamaño máximo elegido. El respaldo completo (`respaldo_*.zip`) se restaura desde Exportar → *Restaurar respaldo*.
 
 ## Pruebas manuales en el S21 Ultra — Fase 1
 
@@ -76,3 +84,13 @@ Se documenta en la Fase 5 (ver sección 8 del brief).
 3. Activar **modo avión**, cerrar la app por completo (deslizar), reabrir: debe cargar y mostrar el nombre.
 4. Importar `edificios_ejemplo.csv` y, además, un CSV guardado desde Excel (con `;` y acentos) → los acentos deben verse bien.
 5. Ajustes → almacenamiento persistente debe decir *Sí*.
+
+## Pruebas manuales en el S21 Ultra — Fases 2–6
+
+1. Registrar 10 activos en modo avión; cerrar la app por completo y reabrir: todo sigue y el contexto (edificio/piso/departamento) se recuerda.
+2. **Tomar foto** abre la cámara nativa; 20 fotos en un activo; zoom sobre una placa de datos legible. **Agregar de galería** con capturas de pantalla.
+3. Con la cámara abierta, forzar el cierre de Chrome: al volver debe existir el borrador.
+4. Grabar 5 audios en modo avión, reiniciar la app y reproducirlos. Cerrar la app grabando: al reabrir debe avisar que recuperó la nota.
+5. Exportar 50 activos con fotos: abrir el ZIP en Windows; `activos.csv` en Excel con acentos correctos; probar *Compartir*.
+6. Crear respaldo, borrar datos del sitio y restaurar.
+7. iPhone (Safari 16.4+): mismo flujo; audio sale como `.m4a`.

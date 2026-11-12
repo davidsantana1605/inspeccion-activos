@@ -1,6 +1,8 @@
 import { APP_VERSION } from './version.js';
 import * as db from './db.js';
 import { parseBuildingsCsv, buildingsToCsv } from './csv.js';
+import * as assetsUi from './assets.js';
+import { recoverOrphanAudio } from './audio.js';
 
 const $app = document.getElementById('app');
 const $banners = document.getElementById('banners');
@@ -47,14 +49,24 @@ function download(filename, blob) {
 }
 
 // ---------- router (hash based: works on GitHub Pages with refresh) ----------
-const routes = { '': viewHome, edificios: viewBuildings, ajustes: viewSettings, ayuda: viewHelp };
+const routes = {
+  '': () => assetsUi.viewHome(h),
+  nuevo: () => assetsUi.viewAssetForm(h, null),
+  activo: (p) => assetsUi.viewAssetForm(h, p.get('id')),
+  departamentos: () => assetsUi.viewDepartments(h),
+  exportar: async () => (await import('./export.js')).viewExport($app, h),
+  edificios: viewBuildings, ajustes: viewSettings, ayuda: viewHelp
+};
 async function render() {
-  const route = (location.hash.replace(/^#\/?/, '') || '').split('?')[0];
+  assetsUi.leave();
+  const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
+  const route = path || '';
   document.querySelectorAll('.topnav a').forEach((a) => a.classList.toggle('active', a.dataset.route === route));
-  try { await (routes[route] || viewHome)(); } catch (e) { reportError(e); }
+  try { await (routes[route] || routes[''])(new URLSearchParams(query)); } catch (e) { reportError(e); }
   $app.focus({ preventScroll: true });
 }
 window.addEventListener('hashchange', render);
+const navigate = (hash) => { if (location.hash === hash || (hash === '#/' && !location.hash)) render(); else location.hash = hash; };
 
 function reportError(e) {
   console.error(e);
@@ -82,27 +94,9 @@ function storageHtml(i) {
   return `<dl class="kv"><dt>Almacenamiento persistente</dt><dd>${p}</dd><dt>Espacio usado</dt><dd>${usage}</dd></dl>`;
 }
 
-// ---------- views ----------
-async function viewHome() {
-  const [nB, nA, inspector, info] = await Promise.all([db.count('buildings'), db.count('assets'), db.getSetting('inspector', ''), storageInfo()]);
-  const todo = [];
-  if (!inspector) todo.push('<li>Escribe tu nombre de inspector en <a href="#/ajustes">Ajustes</a>.</li>');
-  if (!nB) todo.push('<li>Importa la lista de edificios en <a href="#/edificios">Edificios</a>.</li>');
-  $app.innerHTML = `
-    <h1>Inicio</h1>
-    ${todo.length ? `<div class="card"><strong>Configuración pendiente</strong><ul>${todo.join('')}</ul></div>` : ''}
-    <div class="card">
-      <dl class="kv">
-        <dt>Inspector</dt><dd>${esc(inspector) || '<span class="muted">(sin configurar)</span>'}</dd>
-        <dt>Edificios cargados</dt><dd>${nB}</dd>
-        <dt>Activos registrados</dt><dd>${nA}</dd>
-        <dt>Versión</dt><dd>${esc(APP_VERSION)}</dd>
-      </dl>
-    </div>
-    <div class="card">${storageHtml(info)}</div>
-    <button class="btn big primary" disabled>+ Nuevo activo (Fase 2)</button>`;
-}
+const h = { $app, $dlg, state, esc, ask, confirmDlg, showBanner, hideBanner, reportError, download, fmtBytes, storageInfo, storageHtml, navigate };
 
+// ---------- views ----------
 async function viewSettings() {
   const [inspector, quality, gps, info] = await Promise.all([db.getSetting('inspector', ''), db.getSetting('photo_quality', 'alta'), db.getSetting('gps_enabled', false), storageInfo()]);
   $app.innerHTML = `
@@ -129,6 +123,7 @@ async function viewSettings() {
       <dl class="kv"><dt>Versión</dt><dd>${esc(APP_VERSION)}</dd><dt>ID de dispositivo</dt><dd>${esc(state.deviceId)}</dd></dl>
       <p><button class="btn" id="check-update">Buscar actualización</button></p>
       <p><a href="#/edificios">Administrar edificios →</a></p>
+      <p><a href="#/departamentos">Administrar departamentos →</a></p>
     </div>`;
   const flash = () => { const s = document.getElementById('saved'); s.textContent = 'Guardado ✓'; clearTimeout(flash.t); flash.t = setTimeout(() => (s.textContent = ''), 1500); };
   const save = async (k, v) => { try { await db.setSetting(k, v); flash(); } catch (e) { reportError(e); } };
@@ -241,7 +236,7 @@ function viewHelp() {
       <ol><li>Abre la dirección de la app en Chrome <strong>con internet</strong> (una sola vez).</li><li>Menú ⋮ → <strong>Instalar app</strong> / Añadir a pantalla de inicio.</li><li>Ábrela desde el ícono. Prueba en modo avión.</li></ol></div>
     <div class="card"><h2 style="margin-top:0">Instalar en iPhone (Safari)</h2>
       <ol><li>Abre la dirección en Safari.</li><li>Compartir → <strong>Añadir a pantalla de inicio</strong>.</li><li>Abre siempre desde el ícono (iOS 16.4 o superior). El almacenamiento en iOS es más restrictivo: exporta con frecuencia.</li></ol></div>
-    <div class="card"><h2 style="margin-top:0">Exportar</h2><p class="muted">La exportación de activos llega en la Fase 5.</p></div>`;
+    <div class="card"><h2 style="margin-top:0">Exportar</h2><p class="muted">Menú <a href="#/exportar">Exportar</a>: genera ZIP por lotes para procesar en escritorio, y un respaldo completo.</p></div>`;
 }
 
 // ---------- service worker ----------
@@ -267,6 +262,7 @@ async function boot() {
   try {
     state.deviceId = await db.ensureDeviceId();
     state.persisted = await requestPersistence();
+    recoverOrphanAudio().then((n) => { if (n) showBanner('audio-rec', 'info', `Se recuperaron ${n} nota(s) de voz de una grabación interrumpida.`, [{ label: 'OK', onClick: () => hideBanner('audio-rec') }]); }).catch(() => {});
     if (!state.persisted) showBanner('persist', 'warn', 'El navegador no concedió almacenamiento persistente. Exporta tus datos con frecuencia.', [{ label: 'Entendido', onClick: () => hideBanner('persist') }]);
   } catch (e) {
     showBanner('db', 'error', 'No se puede usar el almacenamiento local: ' + esc(e.message) + ' La app no puede guardar datos en este modo (¿navegación privada?).');
